@@ -1,0 +1,13 @@
+*.pyc
+__pycache__/
+.venv/
+venv/
+env/
+.streamlit/secrets.toml
+*.xlsx
+!tests/**/*.xlsx
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+salida_prueba.xlsx

@@ -1,0 +1,10 @@
+# Versiones minimas verificadas. Se usan rangos, no pines exactos, para que la
+# instalacion funcione tambien en otros equipos con Python 3.11.
+#
+# Probado con Python 3.11 y 3.13.
+
+streamlit>=1.64.0
+pandas>=2.2.0
+numpy>=1.26.0
+openpyxl>=3.1.5
+altair>=5.4.0
