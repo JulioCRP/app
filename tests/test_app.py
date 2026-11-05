@@ -45,7 +45,7 @@ def test_app_con_archivo_real() -> None:
     for esperada in ("Productos", "Unidades salidas"):
         assert esperada in etiquetas, f"falta el indicador {esperada}"
 
-    assert len(at.tabs) == 4, "se esperaban 4 pestanas"
+    assert len(at.tabs) == 5, "se esperaban 5 pestanas (incluye Dias Disponibilidad)"
     print(f"    pestanas: {[t.label for t in at.tabs]}")
 
     assert len(at.dataframe) >= 1, "se esperaba la tabla de promedios"

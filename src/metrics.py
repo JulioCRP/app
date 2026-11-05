@@ -208,6 +208,115 @@ def resumen_productos(
     return _ordenar_columnas(resumen)
 
 
+def dias_disponibilidad_por_producto(movimientos: pd.DataFrame) -> pd.DataFrame:
+    """Calcula los dias de disponibilidad por producto y mes.
+
+    Para cada codigo de producto y mes, cuenta la cantidad de dias unicos
+    en los que el campo ``saldo_cant`` es mayor a cero, basado en la
+    ``fecha elaboracion``.
+
+    Returns
+    -------
+    pd.DataFrame
+        columnas: codigo, anio, mes, dias_disponibles
+    """
+    base = movimientos[movimientos["fecha"].notna() & (movimientos["saldo_cant"] > 0)].copy()
+
+    if base.empty:
+        return pd.DataFrame(columns=["codigo", "anio", "mes", "dias_disponibles"])
+
+    # Parsear la fecha texto a datetime para poder extraer el dia unico
+    base["fecha_dt"] = pd.to_datetime(base["fecha"], format="%d/%m/%Y", errors="coerce")
+
+    # Contar dias unicos con saldo_cant > 0 por producto, anio, mes
+    dias = (
+        base.groupby(["codigo", "anio", "mes"])
+        .apply(
+            lambda g: len(
+                set(g[g["saldo_cant"] > 0]["fecha_dt"].dt.date.astype(str))
+            ),
+            include_groups=False,
+        )
+        .reset_index()
+        .rename({0: "dias_disponibles"}, axis=1)
+    )
+
+    return dias
+
+
+def dias_disponibilidad_por_producto_horiz(movimientos: pd.DataFrame) -> pd.DataFrame:
+    """Calcula y formatea dias de disponibilidad en formato horizontal por producto.
+
+    Para cada codigo de producto, muestra los dias de disponibilidad por mes
+    (Ene-Dic) de forma horizontal, mas dos columnas finales:
+    - ``Total``: suma de dias disponibles del producto a lo largo de los meses (filas)
+    - ``Total por meses``: equivalente en meses (Total ÷ 30 dias/mes) del total de dias
+      de disponibilidad del producto durante el periodo analizado.
+
+    Returns
+    -------
+    pd.DataFrame
+        columnas: codigo, Ene, Feb, Mar, Abr, May, Jun, Jul, Ago, Sep, Oct, Nov, Dic, Total, Total por meses
+    """
+    base = movimientos[movimientos["fecha"].notna() & (movimientos["saldo_cant"] > 0)].copy()
+
+    if base.empty:
+        meses_cols = [m.lower() for m in MESES_ES]
+        return pd.DataFrame(
+            columns=["codigo"] + meses_cols + ["Total", "Total por meses"]
+        )
+
+    # Parsear la fecha texto a datetime para poder extraer el dia unico
+    base["fecha_dt"] = pd.to_datetime(base["fecha"], format="%d/%m/%Y", errors="coerce")
+
+    # Contar dias unicos con saldo_cant > 0 por producto, anio, mes
+    dias = (
+        base.groupby(["codigo", "anio", "mes"])
+        .apply(
+            lambda g: len(
+                set(g[g["saldo_cant"] > 0]["fecha_dt"].dt.date.astype(str))
+            ),
+            include_groups=False,
+        )
+        .reset_index()
+        .rename({0: "dias_disponibles"}, axis=1)
+    )
+
+    # Pivot horizontal: filas=códigos, columnas=meses(1-12)
+    pivot = dias.pivot_table(
+        index="codigo",
+        columns="mes",
+        values="dias_disponibles",
+        aggfunc="sum",
+        fill_value=0,
+    )
+
+    # Normalizar columnas a enteros (pueden venir como float del groupby)
+    pivot.columns = [int(c) for c in pivot.columns]
+
+    # Asegurar columnas de los 12 meses (1-12), ordenados
+    for m in range(1, 13):
+        if m not in pivot.columns:
+            pivot[m] = 0
+    pivot = pivot.sort_index(axis=1)
+
+    # Renombrar columnas a nombres de meses en español
+    pivot.columns = [MESES_ES[m - 1] for m in pivot.columns]
+
+    # Agregar columna Total (suma de los 12 meses por fila)
+    pivot["Total"] = pivot.sum(axis=1)
+
+    # Agregar columna "Total por meses" (Total ÷ 30 dias/mes)
+    pivot["Total por meses"] = (pivot["Total"] / 30).round(2)
+
+    # Restablecer índice y asegurar orden de columnas
+    resultado = pivot.reset_index()
+    columnas_orden = ["codigo"] + list(MESES_ES) + ["Total", "Total por meses"]
+    resultado = resultado[columnas_orden]
+
+    return resultado
+
+
 def _ordenar_columnas(resumen: pd.DataFrame) -> pd.DataFrame:
     """Coloca las columnas en un orden legible para el usuario."""
     base = [

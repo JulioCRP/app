@@ -244,7 +244,7 @@ if variacion is not None:
 # Vistas
 # --------------------------------------------------------------------------
 pestanas = st.tabs(
-    ["Evolucion mensual", "Productos destacados", "Tabla de promedios", "Calidad de datos"]
+    ["Evolucion mensual", "Productos destacados", "Tabla de promedios", "Calidad de datos", "Dias Disponibilidad"]
 )
 
 with pestanas[0]:
@@ -453,6 +453,68 @@ with pestanas[3]:
     sin_problemas = sum(1 for a in alertas if a["cantidad"] == 0)
     if sin_problemas:
         st.success(f"{sin_problemas} de {len(alertas)} controles sin hallazgos.")
+
+
+with pestanas[4]:
+    st.caption("Dias de disponibilidad por producto y mes, calculados desde el campo "
+               "``Fecha elaboracion`` y ``Saldo cantidades``.")
+    # Usar nueva funcion horizontal formato tabla
+    dia_df = metrics.dias_disponibilidad_por_producto_horiz(mov_filtrado)
+    if dia_df.empty:
+        st.info("No hay datos de disponibilidad con los filtros seleccionados.")
+    else:
+        # Aplicar filtros adicionales si son necesarios
+        codigos_filtrados_dia = set(dia_df["codigo"].dropna())
+        dia_df_filtrado = dia_df[dia_df["codigo"].isin(codigos_filtrados_dia)].copy()
+        
+        # Configurar column_config: meses con %d, Total y Total por meses
+        column_config = {"codigo": "Codigo"}
+        for mes in MESES_ES:
+            column_config[mes] = st.column_config.NumberColumn(mes, format="%d")
+        column_config["Total"] = st.column_config.NumberColumn("Total", format="%d")
+        column_config["Total por meses"] = st.column_config.NumberColumn(
+            "Total por meses", format="%.2f"
+        )
+        
+        st.dataframe(
+            dia_df_filtrado,
+            width="stretch",
+            hide_index=True,
+            column_config=column_config,
+        )
+        
+        with st.expander('Ver estadísticas por mes'):
+            # Derretir el dataframe a formato largo: cada fila es un producto-mes
+            dia_largo = dia_df_filtrado.melt(
+                id_vars=['codigo'],
+                value_vars=list(MESES_ES),
+                var_name='mes',
+                value_name='dias_disponibles',
+            )
+            if not dia_largo.empty:
+                stats_por_mes = (
+                    dia_largo.groupby('mes')['dias_disponibles']
+                    .agg(['sum', 'mean', 'count'])
+                    .reset_index()
+                )
+                # Formatear nombres de meses para display
+                stats_por_mes['mes_label'] = stats_por_mes['mes'].map(
+                    lambda m: f'{int(m):02d}' if isinstance(m, (int, float)) else m
+                )
+                st.dataframe(
+                    stats_por_mes,
+                    width='stretch',
+                    hide_index=True,
+                    column_config={
+                        'mes': 'Mes',
+                        'sum': 'Total dias disponibles',
+                        'mean': 'Promedio de dias',
+                        'count': 'Productos evaluados',
+                        'mes_label': 'Mes',
+                    },
+                )
+
+
 
 
 # --------------------------------------------------------------------------
